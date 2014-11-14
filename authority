@@ -1,0 +1,139 @@
+__author__ = 'hjm'
+
+import constants
+reload(constants)
+from constants import *
+
+import random
+import numpy as np
+from operator import itemgetter
+
+class Authority(object):
+    def __init__(self):
+
+        self.auths = {a: {} for a in AUTH_LIST}
+
+        self.init_authorities()
+
+    def init_authorities(self):
+
+        for a in AUTH_LIST:
+            self.auths[a]['role'] = a
+            self.auths[a]['type'] = AUTH_LIST[a]
+            self.auths[a]['tgt'] = AUTH_TGT[a]  # calculate will to assist
+            self.auths[a]['wg'] = {g: 1.0 for g in GP_LIST}  # consider an init
+            self.auths[a]['wa'] = {a: 1.0 for a in AUTH_LIST}  # consider an init
+            self.auths[a]['comms'] = AUTH_CHAR[a]['comm'].copy()
+            self.auths[a]['cap'] = {i: (int(POP_TOTAL * AUTH_CHAR[a]['cap'][i])) for i in ISSUES_LIST}
+            self.auths[a]['capbal'] = self.auths[a]['cap'].copy()  # changes each day
+            self.auths[a]['capred'] = 0  # no interference registered
+            self.auths[a]['cost'] = OPP_COST[a].copy()
+            self.auths[a]['intf'] = AUTH_CHAR[a]['intf'].copy()  # p(successful interruption of competitor's operation)
+            self.auths[a]['vul'] = float(AUTH_CHAR[a]['vul'])  # am i vulnerable to a threat/bribe?
+            self.auths[a]['spttemp'] = {g: 0 for g in GP_LIST}  # holds the support data for the time period
+            self.auths[a]['spt'] = self.auths[a]['spttemp'].copy()  # the record of total support from the last period
+            self.auths[a]['sptlim'] = AUTH_CHAR[a]['sptlim']  # lowest acceptable level for tgt-spt before coercion
+            self.auths[a]['sptrel'] = {a1: 0.0 for a1 in AUTH_LIST_NOCMTY}  # 0.0 = they have no support from my const.
+            self.auths[a]['sptrel'][a] = 1.0  # i have 100% as init
+            self.auths[a]['xeval'] = {a1: 0.0 for a1 in AUTH_LIST_NOCMTY if a1 != a}  # last model started at all= 0.97
+            self.auths[a]['xbal'] = {a1: {'n': 0, 'x': 0.0} for a1 in AUTH_LIST_NOCMTY if a1 != a}
+            self.auths[a]['xlim'] = AUTH_CHAR[a]['xlim']  # positive signal if > xlim
+
+    def auth_updates(self, pop, d):
+
+        _AUTHUPDATE = 30
+
+        self.auth_update_capacity()
+
+        if d % _AUTHUPDATE == 0:
+            self.auth_update_support()
+            self.auth_update_rel_spt()
+            self.auth_update_group_assessment(pop)  #### pop dict from admin
+            self.auth_update_xeval()
+
+    ##################################################################  UPDATES
+
+    def auth_update_capacity(self):  # reset capacity everyday
+
+        for a in self.auths:  # updating capacity w/pop growth - but govt must explicitly do this, !! CMTY updates??
+            self.auths[a]['cap'] = {i: (int(self.pop['tot'] * AUTH_CHAR[a]['cap'][i])) for i in ISSUES_LIST}
+            self.auths[a]['capbal'] = self.auths[a]['cap'].copy()
+            self.auths[a]['capred'] = 0
+
+    def auth_update_support(self):  # sum up the requests from residents by group
+
+        for a in AUTH_LIST_NOCMTY:
+            self.auths[a]['spt'] = self.auths[a]['spttemp'].copy()  # establish the record of the last n-days
+            self.auths[a]['spttemp'] = {g: 0.0 for g in GP_LIST}  # reset the record
+
+    def auth_nsa_update_capacity(self, pop, update):
+
+        for a in AUTH_LIST_NSA:
+
+            tpop = pop[self.auths[a]['tgt']]
+            spt = self.auths[a]['spt'][self.auths[a]['tgt']] / float(update)
+
+            cc = (np.exp(2 * spt) / np.exp(2 * 1)) * tpop * NSA_RECRUIT  # max% of the population that can be recruited
+            ac = self.auths[a]['capbal']  # this is reduced every day that there is interference, then evaluated at end
+
+    def auth_update_xeval(self):  # rate the exchange history with other auths
+
+        for a in self.auths:
+            for a1 in AUTH_LIST_NOCMTY:
+                if a != a1:
+                    t = self.auths[a]['xbal'][a1]['x'] / float(.001 + self.auths[a]['xbal'][a1]['n'])
+                    self.auths[a]['xeval'][a1] = t
+
+    def auth_nsa_update_gov_assessment(self):
+
+        for a in AUTH_LIST_NSA:
+
+            # cc = f(CS) * TGTPOP * RECRUIT == int
+            # ac = capbal == int
+            # spt = total support from tgt-gp / days = spt/day mean
+
+            f1 = 1/(1+0.0001*(0.00001**(-1*(ac/float(ac+spt)))))
+            f2 = 1/(1+0.0001*(0.00001**(-1*(ac/float(cc)))))
+
+            self.auths[a]['wa']['gov'] = f1 * f2
+
+    def auth_gov_update_nsa_assessment(self):
+
+        s = {g: (self.auths['gov']['spt'][g] + 0.001) for g in GP_LIST}  # the total support over the time frame from each gp
+
+        for g in s:  # consider doing in a global update: get the total support to auths over the timeframe
+            for a in AUTH_LIST_NSA:
+                s[g] += self.auths[a]['spt'][g]
+
+        for a in AUTH_LIST_NSA:
+
+            vmax = 0.0
+
+            for g in GP_LIST:
+
+                t = self.auths[a]['spt'][g] / float(s[g])  # share of group support
+                v = self.auths[a]['wg'][g] * (1 - (1/(1+0.05*(0.00001**(-1*t)))))  # value to gov of that share of spt
+
+                if v > vmax:
+                    self.auths['gov']['wa'][a] = v  # value to gov is the highest value out of all group support
+
+
+    def auth_update_group_assessment(self, pop):  # pop = dict with all population data
+
+        for a in self.auths:
+            if a != 'cmty':
+                for g in GP_LIST:
+
+                    if g == self.auths[a]['tgt']:
+
+                        self.auths[a]['wg'][g] = 0.97  # max is 0.97
+
+                    else:
+                        fp = (1 - (1/(1+POL_OPEN*(0.00001**(-1*(self.pop['share'][g]))))))  # f(polcomp)
+                        fpr = GP_REL * fp  # f(polcomp, relations)
+
+                        if a == 'gov':
+                            self.auths[a]['wg'][g] = fpr + (POL_FAC * (1 - fpr))  # f(polcomp, relations, factionalism)
+
+                        else:
+                            self.auths[a]['wg'][g] = fpr + (NSA_ID_STR * (1 - fpr))  # f(polcomp, relations, identity)
