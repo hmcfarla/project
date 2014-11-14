@@ -14,6 +14,8 @@ class Authority(object):
         self.auths = {a: {} for a in AUTH_LIST}
 
         self.init_authorities()
+# data that we need to track
+# 
 
     def init_authorities(self):
 
@@ -23,8 +25,8 @@ class Authority(object):
             self.auths[a]['tgt'] = AUTH_TGT[a]  # calculate will to assist
             self.auths[a]['wg'] = {g: 1.0 for g in GP_LIST}  # consider an init
             self.auths[a]['wa'] = {a: 1.0 for a in AUTH_LIST}  # consider an init
-            self.auths[a]['comms'] = AUTH_CHAR[a]['comm'].copy()
-            self.auths[a]['cap'] = {i: (int(POP_TOTAL * AUTH_CHAR[a]['cap'][i])) for i in ISSUES_LIST}
+            self.auths[a]['comms'] = AUTH_CHAR[a]['comm'].copy()  # group communication
+            self.auths[a]['cap'] = {}
             self.auths[a]['capbal'] = self.auths[a]['cap'].copy()  # changes each day
             self.auths[a]['capred'] = 0  # no interference registered
             self.auths[a]['cost'] = OPP_COST[a].copy()
@@ -38,6 +40,14 @@ class Authority(object):
             self.auths[a]['xeval'] = {a1: 0.0 for a1 in AUTH_LIST_NOCMTY if a1 != a}  # last model started at all= 0.97
             self.auths[a]['xbal'] = {a1: {'n': 0, 'x': 0.0} for a1 in AUTH_LIST_NOCMTY if a1 != a}
             self.auths[a]['xlim'] = AUTH_CHAR[a]['xlim']  # positive signal if > xlim
+            
+            # init capacity
+            if a = 'gov':
+                self.auths[a] = {i: (int(POP_TOTAL * AUTH_CHAR['gov']['cap'][i])) for i in ISSUES_LIST}
+            else:
+                for a in AUTH_LIST_NSA:
+                    tpop = pop[self.auths[a]['tgt']]
+                    spt = self.auths[a]['spt'][self.auths[a]['tgt']] / float(update)
 
     def auth_updates(self, pop, d):
 
