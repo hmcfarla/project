@@ -25,7 +25,7 @@ class Authority(object):
             self.auths[a]['wa'] = {a: 1.0 for a in AUTH_LIST}  # consider an init
             self.auths[a]['comms'] = AUTH_CHAR[a]['comm'].copy()  # group communication
             self.auths[a]['cap'] = {}
-            self.auths[a]['capbal'] = self.auths[a]['cap'].copy()  # changes each day
+            self.auths[a]['capbal'] = {}
             self.auths[a]['capred'] = 0  # no interference registered
             self.auths[a]['cost'] = OPP_COST[a].copy()
             self.auths[a]['intf'] = AUTH_CHAR[a]['intf'].copy()  # p(successful interruption of competitor's operation)
@@ -41,15 +41,17 @@ class Authority(object):
             
             # init capacity
             if a not in AUTH_LIST_NSA:  # for gov and cmty
-                self.auths[a] = {i: (int(POP_TOTAL * AUTH_CHAR[a]['cap'][i])) for i in ISSUES_LIST}
+                c = {i: (int(POP_TOTAL * AUTH_CHAR[a]['cap'][i])) for i in ISSUES_LIST}
             else:
                 tpop = pop[self.auths[a]['tgt']]
                 spt = self.auths[a]['spt'][self.auths[a]['tgt']] / float(AUTH_UPDATE)
-                self.auths[a] = (np.exp(2 * spt) / np.exp(2 * 1)) * tpop * NSA_RECRUIT  # max% of the population that can be recruited
+                cp = (np.exp(2 * spt) / np.exp(2 * 1)) * tpop * NSA_RECRUIT  # max% of the population that can be recruited
+                c = {i: AUTH_CHAR[a]['cap'][i] * cp for i in ISSUES_LIST}
+            
+            self.auths[a]['cap'] = c
+            self.auths[a]['capbal'] = self.auths[a]['cap'].copy()  # changes each day
 
     def auth_updates(self, pop, d):
-
-        _AUTHUPDATE = 30
 
         self.auth_update_capacity()
 
@@ -61,12 +63,11 @@ class Authority(object):
 
     ##################################################################  UPDATES
 
-    def auth_update_capacity(self):  # reset capacity everyday
+    def auth_gov_update_capacity(self):  # reset capacity everyday
 
         for a in self.auths:  # updating capacity w/pop growth - but govt must explicitly do this, !! CMTY updates??
             self.auths[a]['cap'] = {i: (int(self.pop['tot'] * AUTH_CHAR[a]['cap'][i])) for i in ISSUES_LIST}
             self.auths[a]['capbal'] = self.auths[a]['cap'].copy()
-            self.auths[a]['capred'] = 0
 
     def auth_update_support(self):  # sum up the requests from residents by group
 
@@ -80,9 +81,8 @@ class Authority(object):
 
             tpop = pop[self.auths[a]['tgt']]
             spt = self.auths[a]['spt'][self.auths[a]['tgt']] / float(update)
-
             cc = (np.exp(2 * spt) / np.exp(2 * 1)) * tpop * NSA_RECRUIT  # max% of the population that can be recruited
-            ac = self.auths[a]['capbal']  # this is reduced every day that there is interference, then evaluated at end
+            self.auths[a]['cap'] = {i: AUTH_CHAR[a]['cap'][i] * cc for i in ISSUES_LIST}
 
     def auth_update_xeval(self):  # rate the exchange history with other auths
 
@@ -99,7 +99,10 @@ class Authority(object):
             # cc = f(CS) * TGTPOP * RECRUIT == int
             # ac = capbal == int
             # spt = total support from tgt-gp / days = spt/day mean
-
+            
+            cc = (np.exp(2 * spt) / np.exp(2 * 1)) * tpop * NSA_RECRUIT  # max% of the population that can be recruited
+            ac = self.auths[a]['capbal']  # this is reduced every day that there is interference, then evaluated at end
+            
             f1 = 1/(1+0.0001*(0.00001**(-1*(ac/float(ac+spt)))))
             f2 = 1/(1+0.0001*(0.00001**(-1*(ac/float(cc)))))
 
