@@ -75,14 +75,14 @@ class Authority(object):
 
         for a in AUTH_LIST_NOCMTY:
             self.auths[a]['spt'] = self.auths[a]['spttemp'].copy()  # establish the record of the last n-days
-            self.auths[a]['spttemp'] = {g: 0.0 for g in GP_LIST}  # reset the record
+            self.auths[a]['spttemp'] = {g: 0 for g in GP_LIST}  # reset the record
 
-    def auth_nsa_update_capacity(self, pop, update):
+    def auth_nsa_update_capacity(self, pop):
 
         for a in AUTH_LIST_NSA:
 
             tpop = pop[self.auths[a]['tgt']]
-            spt = self.auths[a]['spt'][self.auths[a]['tgt']] / float(update)
+            spt = self.auths[a]['spt'][self.auths[a]['tgt']] / float(AUTH_UPDATE)
             cc = (np.exp(2 * spt) / np.exp(2 * 1)) * tpop * NSA_RECRUIT  # max% of the population that can be recruited
             self.auths[a]['cap'] = {i: AUTH_CHAR[a]['cap'][i] * cc for i in ISSUES_LIST}
 
