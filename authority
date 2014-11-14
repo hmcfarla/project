@@ -9,15 +9,13 @@ import numpy as np
 from operator import itemgetter
 
 class Authority(object):
-    def __init__(self):
+    def __init__(self, pop):
 
         self.auths = {a: {} for a in AUTH_LIST}
 
-        self.init_authorities()
-# data that we need to track
-# 
+        self.init_authorities(pop)
 
-    def init_authorities(self):
+    def init_authorities(self, pop):
 
         for a in AUTH_LIST:
             self.auths[a]['role'] = a
@@ -42,12 +40,12 @@ class Authority(object):
             self.auths[a]['xlim'] = AUTH_CHAR[a]['xlim']  # positive signal if > xlim
             
             # init capacity
-            if a = 'gov':
-                self.auths[a] = {i: (int(POP_TOTAL * AUTH_CHAR['gov']['cap'][i])) for i in ISSUES_LIST}
+            if a not in AUTH_LIST_NSA:  # for gov and cmty
+                self.auths[a] = {i: (int(POP_TOTAL * AUTH_CHAR[a]['cap'][i])) for i in ISSUES_LIST}
             else:
-                for a in AUTH_LIST_NSA:
-                    tpop = pop[self.auths[a]['tgt']]
-                    spt = self.auths[a]['spt'][self.auths[a]['tgt']] / float(update)
+                tpop = pop[self.auths[a]['tgt']]
+                spt = self.auths[a]['spt'][self.auths[a]['tgt']] / float(AUTH_UPDATE)
+                self.auths[a] = (np.exp(2 * spt) / np.exp(2 * 1)) * tpop * NSA_RECRUIT  # max% of the population that can be recruited
 
     def auth_updates(self, pop, d):
 
@@ -55,7 +53,7 @@ class Authority(object):
 
         self.auth_update_capacity()
 
-        if d % _AUTHUPDATE == 0:
+        if d % AUTHUPDATE == 0:
             self.auth_update_support()
             self.auth_update_rel_spt()
             self.auth_update_group_assessment(pop)  #### pop dict from admin
