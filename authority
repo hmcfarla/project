@@ -26,15 +26,16 @@ class Authority(object):
             self.auths[a]['comms'] = AUTH_CHAR[a]['comm'].copy()  # group communication
             self.auths[a]['cap'] = {}
             self.auths[a]['capbal'] = {}
-            self.auths[a]['capred'] = 0  # no interference registered
             self.auths[a]['cost'] = OPP_COST[a].copy()
             self.auths[a]['intf'] = AUTH_CHAR[a]['intf'].copy()  # p(successful interruption of competitor's operation)
             self.auths[a]['vul'] = float(AUTH_CHAR[a]['vul'])  # am i vulnerable to a threat/bribe?
             self.auths[a]['spttemp'] = {g: 0 for g in GP_LIST}  # holds the support data for the time period
             self.auths[a]['spt'] = self.auths[a]['spttemp'].copy()  # the record of total support from the last period
+            
             self.auths[a]['sptlim'] = AUTH_CHAR[a]['sptlim']  # lowest acceptable level for tgt-spt before coercion
             self.auths[a]['sptrel'] = {a1: 0.0 for a1 in AUTH_LIST_NOCMTY}  # 0.0 = they have no support from my const.
             self.auths[a]['sptrel'][a] = 1.0  # i have 100% as init
+            
             self.auths[a]['xeval'] = {a1: 0.0 for a1 in AUTH_LIST_NOCMTY if a1 != a}  # last model started at all= 0.97
             self.auths[a]['xbal'] = {a1: {'n': 0, 'x': 0.0} for a1 in AUTH_LIST_NOCMTY if a1 != a}
             self.auths[a]['xlim'] = AUTH_CHAR[a]['xlim']  # positive signal if > xlim
@@ -42,6 +43,7 @@ class Authority(object):
             # init capacity
             if a not in AUTH_LIST_NSA:  # for gov and cmty
                 c = {i: (int(POP_TOTAL * AUTH_CHAR[a]['cap'][i])) for i in ISSUES_LIST}
+            
             else:
                 tpop = pop[self.auths[a]['tgt']]
                 spt = self.auths[a]['spt'][self.auths[a]['tgt']] / float(AUTH_UPDATE)
@@ -53,7 +55,8 @@ class Authority(object):
 
     def auth_updates(self, pop, d):
 
-        self.auth_update_capacity()
+        self.auth_gov_update_capacity()
+        self.auth_nsa_update_capacity()
 
         if d % AUTHUPDATE == 0:
             self.auth_update_support()
@@ -65,9 +68,8 @@ class Authority(object):
 
     def auth_gov_update_capacity(self):  # reset capacity everyday
 
-        for a in self.auths:  # updating capacity w/pop growth - but govt must explicitly do this, !! CMTY updates??
-            self.auths[a]['cap'] = {i: (int(self.pop['tot'] * AUTH_CHAR[a]['cap'][i])) for i in ISSUES_LIST}
-            self.auths[a]['capbal'] = self.auths[a]['cap'].copy()
+        self.auths['gov]['cap'] = {i: (int(self.pop['tot'] * AUTH_CHAR[a]['cap'][i])) for i in ISSUES_LIST}
+        self.auths['gov']['capbal'] = self.auths[a]['cap'].copy()
 
     def auth_update_support(self):  # sum up the requests from residents by group
 
